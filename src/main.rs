@@ -37,8 +37,11 @@ fn main() {
                     path.push(chr);
                 }
 
-                match path.as_str() {
-                    "/" => handle_index(_stream),
+                let path_parts: Vec<&str> = path.as_str().split('/').collect();
+
+                match path_parts[1] {
+                    "" => handle_index(_stream),
+                    "echo" => handle_echo(_stream, path_parts),
                     _ => handle_not_found(_stream)
                 }
             },
@@ -52,6 +55,23 @@ fn main() {
 fn handle_index(mut stream: TcpStream) {
     let _ = stream.write(b"HTTP/1.1 200 OK\r\n\r\n");
     let _ = stream.shutdown(Shutdown::Both).expect("shutdown call failed");
+}
+
+fn handle_echo(mut stream: TcpStream, path_parts: Vec<&str>) {
+    let mut body = String::new(); // placeholder to handle /echo without anything to echo
+    
+    if path_parts.len() == 3 { // /echo/asd handling
+        body.push_str(path_parts[2]);
+    }
+
+    let _ = stream.write(b"HTTP/1.1 200 OK\r\n");
+    let _ = stream.write(b"Content-Type: text/plain\r\n");
+    let _ = stream.write(b"Content-Length: ");
+    let _ = stream.write(body.len().to_string().as_bytes());
+    let _ = stream.write(b"\r\n\r\n");
+    let _ = stream.write(body.as_bytes());
+    let _ = stream.shutdown(Shutdown::Both).expect("shutdown call failed");
+
 }
 
 fn handle_not_found(mut stream: TcpStream) {
