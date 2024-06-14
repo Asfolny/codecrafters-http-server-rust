@@ -211,7 +211,7 @@ fn handle_post_file(mut stream: TcpStream, path_parts: Vec<&str>, input_body: St
         let _ = fs::write(file_dir, input_body.as_str());
     }
 
-    let _ = stream.write(b"HTTP/1.1 201 CREATED\r\n");
+    let _ = stream.write(b"HTTP/1.1 201 CREATED\r\n\r\n");
     let _ = stream
         .shutdown(Shutdown::Both)
         .expect("shutdown call failed");
