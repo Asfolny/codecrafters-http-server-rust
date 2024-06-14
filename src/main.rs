@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::thread;
+use std::fs;
+use std::env;
 
 fn main() {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -99,6 +101,7 @@ fn main() {
                         "" => handle_index(_stream),
                         "echo" => handle_echo(_stream, path_parts),
                         "user-agent" => handle_user_agent(_stream, headers),
+                        "files" => handle_file(_stream, path_parts),
                         _ => handle_not_found(_stream),
                     }
                 });
@@ -152,6 +155,55 @@ fn handle_user_agent(mut stream: TcpStream, headers: HashMap<String, String>) {
     let _ = stream
         .shutdown(Shutdown::Both)
         .expect("shutdown call failed");
+}
+
+fn handle_file(mut stream: TcpStream, path_parts: Vec<&str>) {
+    let mut body = String::new();
+
+    if path_parts.len() == 3 {
+        let args = env::args();
+        let mut file_dir = String::new();
+        let mut found_dir_option = false;
+
+        for arg in args {
+            if arg == "--directory" {
+                found_dir_option = true;
+                continue;
+            }
+
+            if found_dir_option {
+                file_dir.push_str(arg.as_str());
+                found_dir_option = false;
+                break;
+            }
+        }
+
+        file_dir.push_str(path_parts[2]);
+        body = match fs::read_to_string(file_dir) {
+            Ok(file) => file,
+            Err(_) => {
+                println!("File does not exist");
+                String::new()
+            }
+        };
+    }
+
+    if body.len() < 1 {
+        let _ = stream.write(b"HTTP/1.1 404 Not Found\r\n\r\n");
+        stream.shutdown(Shutdown::Both).expect("Shutdown call failed");
+        return;
+    }
+
+    let _ = stream.write(b"HTTP/1.1 200 OK\r\n");
+    let _ = stream.write(b"Content-Type: text/plain\r\n");
+    let _ = stream.write(b"Content-Length: ");
+    let _ = stream.write(body.len().to_string().as_bytes());
+    let _ = stream.write(b"\r\n\r\n");
+    let _ = stream.write(body.as_bytes());
+    let _ = stream
+        .shutdown(Shutdown::Both)
+        .expect("shutdown call failed");
+
 }
 
 fn handle_not_found(mut stream: TcpStream) {
