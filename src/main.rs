@@ -208,7 +208,7 @@ fn handle_post_file(mut stream: TcpStream, path_parts: Vec<&str>, input_body: St
 
         file_dir.push_str(path_parts[2]);
         
-        fs::write(file_dir, input_body.as_str());
+        let _ = fs::write(file_dir, input_body.as_str());
     }
 
     let _ = stream.write(b"HTTP/1.1 201 CREATED\r\n");
