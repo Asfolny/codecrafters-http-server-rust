@@ -1,10 +1,10 @@
 // Uncomment this block to pass the first stage
 use std::collections::HashMap;
+use std::env;
+use std::fs;
 use std::io::{Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::thread;
-use std::fs;
-use std::env;
 
 fn main() {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -23,11 +23,14 @@ fn main() {
                     let _ = _stream.read(&mut input[..]);
                     let parsed = input.map(|x| char::from(x));
                     let mut headers: HashMap<String, String> = HashMap::new();
+                    let mut request_body = String::new();
                     let mut path = String::new();
                     let mut path_start = false;
+                    let mut method = String::new();
 
                     for chr in parsed {
                         if !path_start && chr != ' ' {
+                            method.push(chr);
                             continue;
                         }
 
@@ -48,6 +51,8 @@ fn main() {
                     let mut header_name = String::new();
                     let mut header_body = String::new();
                     let mut found_reset = false;
+                    let mut reset_count = 0;
+                    let mut body_start = false;
                     for chr in parsed {
                         if !past_request_line && !found_reset && chr != '\r' && chr != '\n' {
                             continue;
@@ -64,9 +69,25 @@ fn main() {
                             continue;
                         }
 
-                        if !past_header_name && chr != ':' {
+                        if !past_header_name && chr != ':' && chr != '\r' && chr != '\n' && !(found_reset && reset_count == 1) {
+                            reset_count = 0;
                             header_name.push(chr);
                             continue;
+                        }
+
+                        if reset_count == 1 && chr == '\r' {
+                            found_reset = true;
+                            continue;
+                        }
+
+                        if reset_count == 1 && found_reset == true && chr == '\n' {
+                            body_start = true;
+                            continue;
+                        }
+                        
+                        if body_start {
+                            request_body.push(chr);
+                            continue; // this will hoover up all the rest of the request
                         }
 
                         if !past_header_name {
@@ -75,6 +96,7 @@ fn main() {
                         }
 
                         if !found_reset && chr != '\r' {
+                            reset_count = 0;
                             header_body.push(chr);
                             continue;
                         }
@@ -92,17 +114,25 @@ fn main() {
                             headers.insert(header_name, header_body);
                             header_name = String::new();
                             header_body = String::new();
+                            reset_count = 1;
                         }
                     }
 
                     let path_parts: Vec<&str> = path.as_str().split('/').collect();
 
-                    match path_parts[1] {
-                        "" => handle_index(_stream),
-                        "echo" => handle_echo(_stream, path_parts),
-                        "user-agent" => handle_user_agent(_stream, headers),
-                        "files" => handle_file(_stream, path_parts),
-                        _ => handle_not_found(_stream),
+                    match method.as_str() {
+                        "GET" => match path_parts[1] {
+                            "" => handle_index(_stream),
+                            "echo" => handle_echo(_stream, path_parts),
+                            "user-agent" => handle_user_agent(_stream, headers),
+                            "files" => handle_file(_stream, path_parts),
+                            _ => handle_not_found(_stream)
+                        },
+                        "POST" => match path_parts[1] {
+                            "files" => handle_post_file(_stream, path_parts, request_body),
+                            _ => handle_not_found(_stream)
+                        }
+                        _ => handle_not_found(_stream)
                     }
                 });
             }
@@ -157,6 +187,37 @@ fn handle_user_agent(mut stream: TcpStream, headers: HashMap<String, String>) {
         .expect("shutdown call failed");
 }
 
+fn handle_post_file(mut stream: TcpStream, path_parts: Vec<&str>, input_body: String) {
+    if path_parts.len() == 3 {
+        let args = env::args();
+        let mut file_dir = String::new();
+        let mut found_dir_option = false;
+
+        for arg in args {
+            if arg == "--directory" {
+                found_dir_option = true;
+                continue;
+            }
+
+            if found_dir_option {
+                file_dir.push_str(arg.as_str());
+                found_dir_option = false;
+                break;
+            }
+        }
+
+        file_dir.push_str(path_parts[2]);
+        
+        fs::write(file_dir, input_body.as_str());
+    }
+
+    let _ = stream.write(b"HTTP/1.1 201 CREATED\r\n");
+    let _ = stream
+        .shutdown(Shutdown::Both)
+        .expect("shutdown call failed");
+
+}
+
 fn handle_file(mut stream: TcpStream, path_parts: Vec<&str>) {
     let mut body = String::new();
 
@@ -190,7 +251,9 @@ fn handle_file(mut stream: TcpStream, path_parts: Vec<&str>) {
 
     if body.len() < 1 {
         let _ = stream.write(b"HTTP/1.1 404 Not Found\r\n\r\n");
-        stream.shutdown(Shutdown::Both).expect("Shutdown call failed");
+        stream
+            .shutdown(Shutdown::Both)
+            .expect("Shutdown call failed");
         return;
     }
 
@@ -203,7 +266,6 @@ fn handle_file(mut stream: TcpStream, path_parts: Vec<&str>) {
     let _ = stream
         .shutdown(Shutdown::Both)
         .expect("shutdown call failed");
-
 }
 
 fn handle_not_found(mut stream: TcpStream) {
