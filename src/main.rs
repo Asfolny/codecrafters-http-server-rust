@@ -195,7 +195,7 @@ fn handle_file(mut stream: TcpStream, path_parts: Vec<&str>) {
     }
 
     let _ = stream.write(b"HTTP/1.1 200 OK\r\n");
-    let _ = stream.write(b"Content-Type: text/plain\r\n");
+    let _ = stream.write(b"Content-Type: application/octet-stream\r\n");
     let _ = stream.write(b"Content-Length: ");
     let _ = stream.write(body.len().to_string().as_bytes());
     let _ = stream.write(b"\r\n\r\n");
