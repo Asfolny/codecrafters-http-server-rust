@@ -160,6 +160,7 @@ fn handle_index(mut stream: TcpStream) {
 fn handle_echo(mut stream: TcpStream, path_parts: Vec<&str>, headers: HashMap<String, String>) {
     let mut body = String::new(); // placeholder to handle /echo without anything to echo
     let mut valid_encoding = false;
+    let mut chosen_encoding = String::new();
 
     if path_parts.len() == 3 {
         // /echo/asd handling
@@ -171,9 +172,28 @@ fn handle_echo(mut stream: TcpStream, path_parts: Vec<&str>, headers: HashMap<St
             .get("Accept-Encoding")
             .expect("Content-Encoding is needed here");
 
-        for enc in SUPPORTED_ENCODINGS {
-            if enc == header_encoding {
-                valid_encoding = true;
+        let acceptable: Vec<&str> = header_encoding.split(", ").collect();
+
+        if acceptable.len() == 1 {
+            chosen_encoding = acceptable
+                .get(0)
+                .expect("Must have at least 1 encoding in header")
+                .to_string();
+
+            for enc in SUPPORTED_ENCODINGS {
+                if enc == chosen_encoding {
+                    valid_encoding = true;
+                }
+            }
+        } else {
+            'enc_option_loop: for option in acceptable {
+                chosen_encoding = option.to_string();
+                for enc in SUPPORTED_ENCODINGS {
+                    if enc == chosen_encoding {
+                        valid_encoding = true;
+                        break 'enc_option_loop;
+                    }
+                }
             }
         }
     }
@@ -181,12 +201,7 @@ fn handle_echo(mut stream: TcpStream, path_parts: Vec<&str>, headers: HashMap<St
     let _ = stream.write(b"HTTP/1.1 200 OK\r\n");
     if valid_encoding {
         let _ = stream.write(b"Content-Encoding: ");
-        let _ = stream.write(
-            headers
-                .get("Accept-Encoding")
-                .expect("Accept-Encoding is needed here")
-                .as_bytes(),
-        );
+        let _ = stream.write(chosen_encoding.as_bytes());
         let _ = stream.write(b"\r\n");
     }
     let _ = stream.write(b"Content-Type: text/plain\r\n");
