@@ -6,6 +6,8 @@ use std::io::{Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::thread;
 
+const SUPPORTED_ENCODINGS: [&str; 1] = ["gzip"];
+
 fn main() {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
     println!("Logs from your program will appear here!");
@@ -118,12 +120,13 @@ fn main() {
                         }
                     }
 
+                    
                     let path_parts: Vec<&str> = path.as_str().split('/').collect();
 
                     match method.as_str() {
                         "GET" => match path_parts[1] {
                             "" => handle_index(_stream),
-                            "echo" => handle_echo(_stream, path_parts),
+                            "echo" => handle_echo(_stream, path_parts, headers),
                             "user-agent" => handle_user_agent(_stream, headers),
                             "files" => handle_file(_stream, path_parts),
                             _ => handle_not_found(_stream)
@@ -150,15 +153,33 @@ fn handle_index(mut stream: TcpStream) {
         .expect("shutdown call failed");
 }
 
-fn handle_echo(mut stream: TcpStream, path_parts: Vec<&str>) {
+fn handle_echo(mut stream: TcpStream, path_parts: Vec<&str>, headers: HashMap<String, String>) {
     let mut body = String::new(); // placeholder to handle /echo without anything to echo
+    let mut valid_encoding = false;
+
 
     if path_parts.len() == 3 {
         // /echo/asd handling
         body.push_str(path_parts[2]);
     }
 
+    if headers.contains_key("Accept-Encoding") {
+                                             let header_encoding = headers.get("Accept-Encoding").expect("Content-Encoding is needed here");
+                        
+                        for enc in SUPPORTED_ENCODINGS {
+                            if enc == header_encoding {
+                                valid_encoding = true;
+                            }
+                        }
+                    }
+
+
     let _ = stream.write(b"HTTP/1.1 200 OK\r\n");
+    if valid_encoding {
+        let _ = stream.write(b"Content-Encoding: ");
+        let _ = stream.write(headers.get("Accept-Encoding").expect("Accept-Encoding is needed here").as_bytes());
+        let _ = stream.write(b"\r\n");
+    }
     let _ = stream.write(b"Content-Type: text/plain\r\n");
     let _ = stream.write(b"Content-Length: ");
     let _ = stream.write(body.len().to_string().as_bytes());
