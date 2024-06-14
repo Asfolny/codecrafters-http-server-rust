@@ -71,7 +71,12 @@ fn main() {
                             continue;
                         }
 
-                        if !past_header_name && chr != ':' && chr != '\r' && chr != '\n' && !(found_reset && reset_count == 1) {
+                        if !past_header_name
+                            && chr != ':'
+                            && chr != '\r'
+                            && chr != '\n'
+                            && !(found_reset && reset_count == 1)
+                        {
                             reset_count = 0;
                             header_name.push(chr);
                             continue;
@@ -86,7 +91,7 @@ fn main() {
                             body_start = true;
                             continue;
                         }
-                        
+
                         if body_start {
                             request_body.push(chr);
                             continue; // this will hoover up all the rest of the request
@@ -120,7 +125,6 @@ fn main() {
                         }
                     }
 
-                    
                     let path_parts: Vec<&str> = path.as_str().split('/').collect();
 
                     match method.as_str() {
@@ -129,13 +133,13 @@ fn main() {
                             "echo" => handle_echo(_stream, path_parts, headers),
                             "user-agent" => handle_user_agent(_stream, headers),
                             "files" => handle_file(_stream, path_parts),
-                            _ => handle_not_found(_stream)
+                            _ => handle_not_found(_stream),
                         },
                         "POST" => match path_parts[1] {
                             "files" => handle_post_file(_stream, path_parts, request_body, headers),
-                            _ => handle_not_found(_stream)
-                        }
-                        _ => handle_not_found(_stream)
+                            _ => handle_not_found(_stream),
+                        },
+                        _ => handle_not_found(_stream),
                     }
                 });
             }
@@ -157,27 +161,32 @@ fn handle_echo(mut stream: TcpStream, path_parts: Vec<&str>, headers: HashMap<St
     let mut body = String::new(); // placeholder to handle /echo without anything to echo
     let mut valid_encoding = false;
 
-
     if path_parts.len() == 3 {
         // /echo/asd handling
         body.push_str(path_parts[2]);
     }
 
     if headers.contains_key("Accept-Encoding") {
-                                             let header_encoding = headers.get("Accept-Encoding").expect("Content-Encoding is needed here");
-                        
-                        for enc in SUPPORTED_ENCODINGS {
-                            if enc == header_encoding {
-                                valid_encoding = true;
-                            }
-                        }
-                    }
+        let header_encoding = headers
+            .get("Accept-Encoding")
+            .expect("Content-Encoding is needed here");
 
+        for enc in SUPPORTED_ENCODINGS {
+            if enc == header_encoding {
+                valid_encoding = true;
+            }
+        }
+    }
 
     let _ = stream.write(b"HTTP/1.1 200 OK\r\n");
     if valid_encoding {
         let _ = stream.write(b"Content-Encoding: ");
-        let _ = stream.write(headers.get("Accept-Encoding").expect("Accept-Encoding is needed here").as_bytes());
+        let _ = stream.write(
+            headers
+                .get("Accept-Encoding")
+                .expect("Accept-Encoding is needed here")
+                .as_bytes(),
+        );
         let _ = stream.write(b"\r\n");
     }
     let _ = stream.write(b"Content-Type: text/plain\r\n");
@@ -208,7 +217,12 @@ fn handle_user_agent(mut stream: TcpStream, headers: HashMap<String, String>) {
         .expect("shutdown call failed");
 }
 
-fn handle_post_file(mut stream: TcpStream, path_parts: Vec<&str>, input_body: String, headers: HashMap<String, String>) {
+fn handle_post_file(
+    mut stream: TcpStream,
+    path_parts: Vec<&str>,
+    input_body: String,
+    headers: HashMap<String, String>,
+) {
     if path_parts.len() == 3 {
         let args = env::args();
         let mut file_dir = String::new();
@@ -232,13 +246,17 @@ fn handle_post_file(mut stream: TcpStream, path_parts: Vec<&str>, input_body: St
         let mut file_content = String::new();
         let content_length: usize = match headers.get("Content-Length") {
             Some(length) => length.parse().expect("Content-Length MUST be a number"),
-            None => 0
+            None => 0,
         };
 
         if content_length > 0 {
-                file_content.push_str(input_body.get(0..content_length).expect("Body did not contain up to Content-Length"));
+            file_content.push_str(
+                input_body
+                    .get(0..content_length)
+                    .expect("Body did not contain up to Content-Length"),
+            );
         }
-        
+
         let _ = fs::write(file_dir, file_content.as_str());
     }
 
@@ -246,7 +264,6 @@ fn handle_post_file(mut stream: TcpStream, path_parts: Vec<&str>, input_body: St
     let _ = stream
         .shutdown(Shutdown::Both)
         .expect("shutdown call failed");
-
 }
 
 fn handle_file(mut stream: TcpStream, path_parts: Vec<&str>) {

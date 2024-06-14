@@ -37,3 +37,13 @@ Note: This section is for stages 2 and beyond.
    the first time you run it. Subsequent runs will be fast.
 1. Commit your changes and run `git push origin master` to submit your solution
    to CodeCrafters. Test output will be streamed to your terminal.
+
+# Personal notes
+
+This is a pretty horrificly hacky way of getting things done, and does not, and will never, fully implement the RFCs pertaining to a HTTP servers
+
+This is a purely educational project and will not be fit for any purpose
+
+Although I may revisit this and make my own HTTP server eventually
+
+"The first one is always the worst one"
