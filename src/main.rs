@@ -129,7 +129,7 @@ fn main() {
                             _ => handle_not_found(_stream)
                         },
                         "POST" => match path_parts[1] {
-                            "files" => handle_post_file(_stream, path_parts, request_body),
+                            "files" => handle_post_file(_stream, path_parts, request_body, headers),
                             _ => handle_not_found(_stream)
                         }
                         _ => handle_not_found(_stream)
@@ -187,7 +187,7 @@ fn handle_user_agent(mut stream: TcpStream, headers: HashMap<String, String>) {
         .expect("shutdown call failed");
 }
 
-fn handle_post_file(mut stream: TcpStream, path_parts: Vec<&str>, input_body: String) {
+fn handle_post_file(mut stream: TcpStream, path_parts: Vec<&str>, input_body: String, headers: HashMap<String, String>) {
     if path_parts.len() == 3 {
         let args = env::args();
         let mut file_dir = String::new();
@@ -207,8 +207,18 @@ fn handle_post_file(mut stream: TcpStream, path_parts: Vec<&str>, input_body: St
         }
 
         file_dir.push_str(path_parts[2]);
+
+        let mut file_content = String::new();
+        let content_length: usize = match headers.get("Content-Length") {
+            Some(length) => length.parse().expect("Content-Length MUST be a number"),
+            None => 0
+        };
+
+        if content_length > 0 {
+                file_content.push_str(input_body.get(0..content_length).expect("Body did not contain up to Content-Length"));
+        }
         
-        let _ = fs::write(file_dir, input_body.as_str());
+        let _ = fs::write(file_dir, file_content.as_str());
     }
 
     let _ = stream.write(b"HTTP/1.1 201 Created\r\n\r\n");
