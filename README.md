@@ -1,4 +1,4 @@
-[![progress-banner](https://backend.codecrafters.io/progress/http-server/bdcd0de1-cb16-4c82-b715-1e3b36f70c93)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
+[![progress-banner](https://backend.codecrafters.io/progress/http-server/bdcd0de1-cb16-4c82-b715-1e3b36f70c93)](https://app.codecrafters.io/users/Asfolny)
 
 This is a starting point for Rust solutions to the
 ["Build Your Own HTTP server" Challenge](https://app.codecrafters.io/courses/http-server/overview).
