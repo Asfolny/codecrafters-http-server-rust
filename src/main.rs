@@ -5,6 +5,8 @@ use std::fs;
 use std::io::{Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::thread;
+use flate2::write::GzEncoder;
+use flate2::Compression;
 
 const SUPPORTED_ENCODINGS: [&str; 1] = ["gzip"];
 
@@ -205,10 +207,20 @@ fn handle_echo(mut stream: TcpStream, path_parts: Vec<&str>, headers: HashMap<St
         let _ = stream.write(b"\r\n");
     }
     let _ = stream.write(b"Content-Type: text/plain\r\n");
-    let _ = stream.write(b"Content-Length: ");
-    let _ = stream.write(body.len().to_string().as_bytes());
-    let _ = stream.write(b"\r\n\r\n");
-    let _ = stream.write(body.as_bytes());
+    if valid_encoding {
+        let mut encoded_body = Vec::new();
+        let _ = GzEncoder::new(&mut encoded_body, Compression::default()).write_all(body.as_bytes());
+        let _ = stream.write(b"Content-Length: ");
+        let _ = stream.write(encoded_body.len().to_string().as_bytes());
+        let _ = stream.write(b"\r\n\r\n");
+        let _ = stream.write(&encoded_body);
+    } else {
+        let _ = stream.write(b"Content-Length: ");
+        let _ = stream.write(body.len().to_string().as_bytes());
+        let _ = stream.write(b"\r\n\r\n");
+        let _ = stream.write(body.as_bytes());
+    }
+
     let _ = stream
         .shutdown(Shutdown::Both)
         .expect("shutdown call failed");
